@@ -20,12 +20,12 @@ const styles = StyleSheet.create({
   },
   channels: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center'
+    marginTop: 10,
+    marginBottom: 10
   },
   logoContainer: {
     flex: 1,
-    flexBasis: '50%',
+    flexBasis: '30%',
     justifyContent: 'center'
   },
   logo: {
@@ -35,35 +35,56 @@ const styles = StyleSheet.create({
     marginBottom: 50
   },
   controls: {
-    flex: 1
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center'
   }
 });
 
 export default class App extends Component {
   state = {
     buffering: false,
-    muted: false,
     paused: true,
-    channels: [
-      { channel_name: '1', uri: 'https://stream-relay-geo.ntslive.net/stream' },
-      { channel_name: '2', uri: 'https://stream-relay-geo.ntslive.net/stream2' }
-    ],
-    activeChannel: 0
+    channels: {
+      '1': {
+        channel_name: '1',
+        uri: 'https://stream-relay-geo.ntslive.net/stream'
+      },
+      '2': {
+        channel_name: '2',
+        uri: 'https://stream-relay-geo.ntslive.net/stream2'
+      }
+    },
+    activeChannel: null
   };
 
   componentDidMount() {
     fetch('https://www.nts.live/api/v2/live')
       .then(res => res.json())
       .then(({ results }) => {
-        this.setState(state => ({
-          ...state,
-          channels: state.channels.map((channel, i) => ({
-            ...channel,
-            ...results[i]
-          }))
-        }));
+        this.setState(state => {
+          return {
+            ...state,
+            channelsDataLoaded: true,
+            channels: results.reduce((result, channel) => {
+              currentChannel = state.channels[channel.channel_name];
+
+              return {
+                ...result,
+                [channel.channel_name]: {
+                  ...currentChannel,
+                  ...channel
+                }
+              };
+            }, {})
+          };
+        });
       });
   }
+
+  changeChannel = channel_name => {
+    this.setState({ activeChannel: channel_name, paused: false });
+  };
 
   onBuffer = ({ isBuffering }) => {
     this.setState({ buffering: isBuffering });
@@ -74,10 +95,8 @@ export default class App extends Component {
   };
 
   render() {
-    const { buffering, activeChannel, muted, paused, channels } = this.state;
-    const activeChannelURI = channels[activeChannel].uri;
-
-    console.log(this.state);
+    const { buffering, activeChannel, paused, channels } = this.state;
+    const activeChannelURI = activeChannel && channels[activeChannel].uri;
 
     return (
       <View style={styles.container}>
@@ -85,50 +104,48 @@ export default class App extends Component {
           <Image style={styles.logo} source={require('./nts-logo.png')} />
         </View>
 
-        <View style={styles.channels}>
-          {channels.map(channel => (
-            <Channel key={channel.channel_name} {...channel} />
-          ))}
-          <Button
-            title="Stream 1"
-            onPress={() => {
-              this.setState({ activeChannel: 0, paused: false });
-            }}
-          />
-          <Button
-            title="Stream 2"
-            onPress={() => {
-              this.setState({ activeChannel: 1, paused: false });
-            }}
-          />
-        </View>
+        {buffering && <ActivityIndicator />}
 
-        <View style={styles.controls}>
-          <Button
-            title={paused ? 'Play' : 'Pause'}
-            onPress={() => {
-              this.setState(state => ({ paused: !state.paused }));
-            }}
-          />
-          <Button
-            title={muted ? 'Unmute' : ' Mute'}
-            onPress={() => {
-              this.setState(state => ({ muted: !state.muted }));
-            }}
-          />
-          {buffering && <ActivityIndicator />}
-        </View>
+        {!!this.state.channelsDataLoaded && (
+          <View style={styles.channels}>
+            <Channel
+              key={channels[1].channel_name}
+              {...channels[1]}
+              isActive={channels[1].channel_name === activeChannel}
+              onSelect={this.changeChannel}
+            />
 
-        <Audio
-          source={{ uri: activeChannelURI }}
-          paused={paused}
-          muted={muted}
-          onBuffer={this.onBuffer}
-          onError={this.onError}
-          playInBackground
-          playWhenInactive
-          ignoreSilentSwitch="ignore"
-        />
+            <Channel
+              key={channels[2].channel_name}
+              {...channels[2]}
+              isActive={channels[2].channel_name === activeChannel}
+              onSelect={this.changeChannel}
+            />
+          </View>
+        )}
+
+        {activeChannelURI && (
+          <View style={styles.controls}>
+            <Button
+              title={paused ? 'Play' : 'Pause'}
+              onPress={() => {
+                this.setState(state => ({ paused: !state.paused }));
+              }}
+            />
+          </View>
+        )}
+
+        {activeChannelURI && (
+          <Audio
+            source={{ uri: activeChannelURI }}
+            paused={!activeChannelURI || paused}
+            onBuffer={this.onBuffer}
+            onError={this.onError}
+            playInBackground
+            playWhenInactive
+            ignoreSilentSwitch="ignore"
+          />
+        )}
       </View>
     );
   }
