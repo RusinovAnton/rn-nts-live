@@ -1,79 +1,130 @@
 import React, { Component } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Image, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Button,
+  StyleSheet,
+  Image,
+  Text,
+  View
+} from 'react-native';
 import Audio from 'react-native-video';
+
+import Channel from './Channel';
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    flexDirection: 'column',
+    // justifyContent: 'center',
+    backgroundColor: '#000'
+  },
+  channels: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center'
+  },
+  logoContainer: {
+    flex: 1,
+    flexBasis: '50%',
+    justifyContent: 'center'
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    alignSelf: 'center',
+    marginBottom: 50
+  },
+  controls: {
+    flex: 1
+  }
+});
 
 export default class App extends Component {
   state = {
-    buffering: true,
+    buffering: false,
     muted: false,
-    paused: false,
-    streams: [
-      'https://stream-relay-geo.ntslive.net/stream',
-      'https://stream-relay-geo.ntslive.net/stream2',
+    paused: true,
+    channels: [
+      { channel_name: '1', uri: 'https://stream-relay-geo.ntslive.net/stream' },
+      { channel_name: '2', uri: 'https://stream-relay-geo.ntslive.net/stream2' }
     ],
-    activeStream: 0,
+    activeChannel: 0
   };
 
-  onBuffer = () => {
-    this.setState({buffering: true});
+  componentDidMount() {
+    fetch('https://www.nts.live/api/v2/live')
+      .then(res => res.json())
+      .then(({ results }) => {
+        this.setState(state => ({
+          ...state,
+          channels: state.channels.map((channel, i) => ({
+            ...channel,
+            ...results[i]
+          }))
+        }));
+      });
   }
 
-  onEnd = () => {
-    console.log('onEnd', arguments)
-  }
+  onBuffer = ({ isBuffering }) => {
+    this.setState({ buffering: isBuffering });
+  };
 
-  onError = () => {
-    console.log('videoError', arguments)
-  }
-
-  setTime = () => {
-    this.setState({buffering: false})
-  }
-
-  onTimedMetadata = () => {
-    console.log('onTimedMetadata', arguments)
-  }
+  onError = error => {
+    console.error(error);
+  };
 
   render() {
-    const { buffering, activeStream, muted, paused, streams,  } = this.state;
-    const activeStreamUrl = streams[activeStream];
+    const { buffering, activeChannel, muted, paused, channels } = this.state;
+    const activeChannelURI = channels[activeChannel].uri;
+
+    console.log(this.state);
 
     return (
       <View style={styles.container}>
-        <Image
-          style={styles.logo}
-          source={require('./nts-logo.png')}
-        />
-
-
-        <View>
-          <View style={{flex: 1, flexDirection: 'row', justifyContent: 'center', height: 10}}>
-            <Button title="Stream 1" onPress={() => {this.setState({ activeStream: 0 })}}/>
-            <Button title="Stream 2" onPress={() => {this.setState({ activeStream: 1 })}}/>
-          </View>
+        <View style={styles.logoContainer}>
+          <Image style={styles.logo} source={require('./nts-logo.png')} />
         </View>
 
-        <View>
-          { buffering ?
-            <ActivityIndicator/> :
-            (
-              <View>
-                <Button title={paused ? 'Play' : 'Pause'} onPress={() => {this.setState(state => ({ paused: !state.paused}))}} />
-                <Button title={muted ? 'Unmute' : ' Mute'} onPress={() => {this.setState(state => ({muted: !state.muted}))}} />
-              </View>
-            )
-          }
+        <View style={styles.channels}>
+          {channels.map(channel => (
+            <Channel key={channel.channel_name} {...channel} />
+          ))}
+          <Button
+            title="Stream 1"
+            onPress={() => {
+              this.setState({ activeChannel: 0, paused: false });
+            }}
+          />
+          <Button
+            title="Stream 2"
+            onPress={() => {
+              this.setState({ activeChannel: 1, paused: false });
+            }}
+          />
+        </View>
+
+        <View style={styles.controls}>
+          <Button
+            title={paused ? 'Play' : 'Pause'}
+            onPress={() => {
+              this.setState(state => ({ paused: !state.paused }));
+            }}
+          />
+          <Button
+            title={muted ? 'Unmute' : ' Mute'}
+            onPress={() => {
+              this.setState(state => ({ muted: !state.muted }));
+            }}
+          />
+          {buffering && <ActivityIndicator />}
         </View>
 
         <Audio
-          source={{ uri: activeStreamUrl }}
+          source={{ uri: activeChannelURI }}
           paused={paused}
           muted={muted}
           onBuffer={this.onBuffer}
-          onEnd={this.onEnd}
           onError={this.onError}
-          onProgress={this.setTime}
-          onTimedMetadata={this.onTimedMetadata}
           playInBackground
           playWhenInactive
           ignoreSilentSwitch="ignore"
@@ -82,17 +133,3 @@ export default class App extends Component {
     );
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: '#000'
-  },
-  logo: {
-    width: 150,
-    height: 150,
-    alignSelf: 'center',
-    marginBottom: 50
-  }
-});
