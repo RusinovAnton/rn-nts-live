@@ -12,6 +12,12 @@ import Audio from 'react-native-video';
 import Channel from './Channel';
 
 const styles = StyleSheet.create({
+  backgroundArt: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.4,
+  },
   container: {
     flex: 1,
     flexDirection: 'column',
@@ -96,10 +102,17 @@ export default class App extends Component {
 
   render() {
     const { buffering, activeChannel, paused, channels } = this.state;
-    const activeChannelURI = activeChannel && channels[activeChannel].uri;
+    const activeChannelObject = channels[activeChannel];
+    const activeChannelURI = activeChannelObject && activeChannelObject.uri;
+    const backgroundArt =
+      activeChannelObject &&
+      activeChannelObject.now.embeds.details.media.background_large;
 
     return (
       <View style={styles.container}>
+        {backgroundArt && (
+          <Image style={styles.backgroundArt} source={{ uri: backgroundArt }} />
+        )}
         <View style={styles.logoContainer}>
           <Image style={styles.logo} source={require('./nts-logo.png')} />
         </View>
